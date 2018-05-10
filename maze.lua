@@ -1,7 +1,20 @@
-local maze_matrix = {}
-local List = require('user_list')
+local class = require('class')
+local List = require('list')
+local FieldStateEnum = require('fieldStateEnum')
+local Color = require('color')
 
-function maze_matrix.create_empty_maze(width, height)
+local Maze = class('Maze')
+
+function Maze:initialize(width, height, blockSize)
+  self.width = width
+  self.height = height
+  self.blockSize = blockSize
+  self.wallColor = Color(150, 150, 150)
+  self.emptyColor = Color(0, 0, 0)
+  Maze.reset(self, width, height)
+end
+
+function Maze:reset(width, height)
   local result = {}
 
   for i = 1, height do
@@ -11,15 +24,13 @@ function maze_matrix.create_empty_maze(width, height)
     end
   end
 
-  return result
+  self.maze = result
 end
 
-function maze_matrix.show_maze(maze)
-  local height = #maze;
-  local width = #maze[1] or 0;
-  for i = 1, height do
-    for j = 1, width do
-      if maze[i][j] == 0 then
+function Maze:showMaze()
+  for i = 1, self.height do
+    for j = 1, self.width do
+      if self.maze[i][j] == 0 then
         io.write("  ")
       else
         io.write("[]")
@@ -30,85 +41,93 @@ function maze_matrix.show_maze(maze)
   io.write("\n")
 end
 
-function outside_borders(maze, x, y)
-  local height = #maze;
-  local width = #maze[1] or 0;
-  return x < 1 or y < 1 or x >= width - 1 or y >= height - 1
+function _outsideBorders(self, x, y)
+  return x < 1 or y < 1 or x >= self.width - 1 or y >= self.height - 1
 end
 
-function dig_block(maze, x, y, block_size)
-  for i = 0, block_size - 1 do
-    for j = 0, block_size - 1 do
-      maze[y + i][x + j] = 0
+function _digBlock(self, x, y)
+  for i = 0, self.blockSize - 1 do
+    for j = 0, self.blockSize - 1 do
+      self.maze[y + i][x + j] = 0
     end
   end
 end
 
-function dig_horizontal_block(maze, x, y, block_size)
-  for j = 0, block_size - 1 do
-    maze[y][x + j] = 0
+function _digHorizontalBlock(self, x, y)
+  for j = 0, self.blockSize - 1 do
+    self.maze[y][x + j] = 0
   end
 end
 
-function dig_vertical_block(maze, x, y, block_size)
-  for i = 0, block_size - 1 do
-    maze[y + i][x] = 0
+function _digVerticalBlock(self, x, y)
+  for i = 0, self.blockSize - 1 do
+    self.maze[y + i][x] = 0
   end
 end
 
-function check_vertical_block(maze, x, y, block_size)
+function _checkVerticalBlock(self, x, y)
   local valid = true
-  if outside_borders(maze, x, y) then
-    return false
+  
+  if _outsideBorders(self, x, y) then
+    return not valid
   end
-  for i = 0, block_size - 1 do
-    if maze[y + i][x] == 0 then
+  
+  for i = 0, self.blockSize - 1 do
+    if self.maze[y + i][x] == 0 then
       valid = false
       break
     end
   end
+  
   return valid
 end
 
-function check_horizontal_block(maze, x, y, block_size)
+function _checkHorizontalBlock(self, x, y)
   local valid = true
-  if outside_borders(maze, x, y) then
-    return false
+  
+  if _outsideBorders(self, x, y) then
+    return not valid
   end
-  for j = 0, block_size - 1 do
-    if maze[y][x + j] == 0 then
+  
+  for j = 0, self.blockSize - 1 do
+    if self.maze[y][x + j] == 0 then
       valid = false
       break
     end
   end
+  
   return valid
 end
 
-function check_block(maze, x, y, block_size)
+function _checkBlock(self, x, y)
   local valid = true
-  if outside_borders(maze, x, y) then
-    return false
+  
+  if _outsideBorders(self, x, y) then
+    return not valid
   end
-  for i = 0, block_size - 1 do
-    for j = 0, block_size - 1 do
-      if maze[y + i][x + j] == 0 then
+  
+  for i = 0, self.blockSize - 1 do
+    for j = 0, self.blockSize - 1 do
+      if self.maze[y + i][x + j] == 0 then
         valid = false
         break
       end
     end
   end
+  
   return valid
 end
 
-function maze_matrix.carve_maze(maze, x, y, tunnel_size)
-  local queue = List.new()
-  List.pushright(queue, {x = x, y = y})
-  dig_block(maze, x, y, tunnel_size)
+function Maze:carveMaze(initPosition)
+  local queue = List()
+  
+  queue:pushRight({x = initPosition.x, y = initPosition.y})
+  _digBlock(self, initPosition.x, initPosition.y)
 
   while true do
-    local q = List.popright(queue)
-    if q == nil then
-      break;
+    local q = queue:popRight()
+    if not q then
+      break
     end
     
 --    maze_matrix.show_maze(maze)
@@ -126,20 +145,20 @@ function maze_matrix.carve_maze(maze, x, y, tunnel_size)
       local up = false
 
       if d == 0 then
-        dx = tunnel_size --right
+        dx = self.blockSize
         dx2 = 1
         right = true
       elseif d == 1 then
-        dx = -1 --left
-        dx2 = -tunnel_size
+        dx = -1
+        dx2 = -self.blockSize
         left = true
       elseif d == 2 then
-        dy = tunnel_size --down
+        dy = self.blockSize
         dy2 = 1
         down = true
       else
-        dy = -1 --up
-        dy2 = -tunnel_size
+        dy = -1
+        dy2 = -self.blockSize
         up = true
       end
 
@@ -149,36 +168,36 @@ function maze_matrix.carve_maze(maze, x, y, tunnel_size)
       local ny2 = ny + dy2
 
       if right or left then
-        if check_vertical_block(maze, nx, ny, tunnel_size) and check_block(maze, nx2, ny2, tunnel_size) then
-          dig_vertical_block(maze, nx, ny, tunnel_size)
-          dig_block(maze, nx2, ny2, tunnel_size)
-          List.pushright(queue, {x = nx2, y = ny2})
+        if _checkVerticalBlock(self, nx, ny) and _checkBlock(self, nx2, ny2) then
+          _digVerticalBlock(self, nx, ny)
+          _digBlock(self, nx2, ny2)
+          queue:pushRight({x = nx2, y = ny2})
         end
       else
-        if check_horizontal_block(maze, nx, ny, tunnel_size) and check_block(maze, nx2, ny2, tunnel_size) then
-          dig_horizontal_block(maze, nx, ny, tunnel_size)
-          dig_block(maze, nx2, ny2, tunnel_size)
-          List.pushright(queue, {x = nx2, y = ny2})
+        if _checkHorizontalBlock(self, nx, ny) and _checkBlock(self, nx2, ny2) then
+          _digHorizontalBlock(self, nx, ny)
+          _digBlock(self, nx2, ny2)
+          queue:pushRight({x = nx2, y = ny2})
         end
       end
     end
   end
 end
 
-return maze_matrix;
+function Maze:draw(drawer)
+  local wC = self.wallColor
+  local eC = self.emptyColor
+  
+  for i = 1, self.height do
+    for j = 1, self.width do
+      if self.maze[i][j] == FieldStateEnum.EMPTY then
+        love.graphics.setColor(eC.r, eC.g, eC.b)
+      elseif self.maze[i][j] == FieldStateEnum.WALL then
+        love.graphics.setColor(wC.r, wC.g, wC.b)
+      end
+      drawer:drawCell(j, i)
+    end
+  end
+end
 
----- The size of the maze (must be odd).
---block_size = 3
---width = 16 * (block_size + 1) + 4 - 1
---height = 9 * (block_size + 1) + 4 - 1
-
----- Generate and display a random maze.
---maze = init_maze(width, height)
---carve_maze(maze, width, height, 2, 2)
-
---for i = 0, block_size - 1 do
---  maze[width + 2 + i] = 0
---  maze[(height - 2) * width + width - 3 - i] = 0
---end
-
---show_maze(maze, width, height)
+return Maze
