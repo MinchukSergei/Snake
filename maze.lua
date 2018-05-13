@@ -190,10 +190,10 @@ function Maze:draw(drawer)
   
   for i = 1, self.height do
     for j = 1, self.width do
-      if self.maze[i][j] == FieldStateEnum.EMPTY then
-        love.graphics.setColor(eC.r, eC.g, eC.b)
-      elseif self.maze[i][j] == FieldStateEnum.WALL then
+      if self.maze[i][j] == FieldStateEnum.WALL then
         love.graphics.setColor(wC.r, wC.g, wC.b)
+      else
+        love.graphics.setColor(eC.r, eC.g, eC.b)
       end
       drawer:drawCell(j, i)
     end

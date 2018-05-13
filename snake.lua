@@ -3,11 +3,11 @@ local List = require('list')
 local DirectionEnum = require('directionEnum')
 local FieldStateEnum = require('fieldStateEnum')
 local Vector2 = require('vector2')
+local tactile = require('tactile')
 
 local Snake = class('Snake')
 
 local initialSettings = {
-  canMove = true,
   speed = 7
 }
 
@@ -15,13 +15,12 @@ function Snake:initialize(field, color, initPosition, direction, controls)
   self.field = field
   self.color = color
   self.initPosition = initPosition
-  self.canMove = initialSettings.canMove
   self.speed = initialSettings.speed
-  self.controls = controls
-  self.body = List()
-  self.body:pushRight(initPosition)
   self.direction = direction
   self.timer = 0
+  self.body = List()
+  self.body:pushRight(initPosition)
+  self.controls = _initControls(self, controls)
 end
 
 function _getTimerLimit(self)
@@ -55,24 +54,43 @@ function Snake:update(dt)
       nextYPosition = nextYPosition - 1
     end
 
-    self.canMove = self.field.maze.maze[nextYPosition][nextXPosition] == FieldStateEnum.EMPTY
-    
-    for i, v in ipairs(self.field.snakes) do
-      local h = v:getHead()
-      if h.x == nextXPosition and h.y == nextYPosition then
-        self.canMove = false
-        break
-      end
-    end
+    local nextFieldState = self.field.maze.maze[nextYPosition][nextXPosition]
 
-    if self.canMove then
-      self.body:pushLeft(Vector2(nextXPosition, nextYPosition))
-
-      if field.maze.maze[nextYPosition][nextXPosition] == FieldStateEnum.EMPTY then
-        self.body:popRight()
+    if nextFieldState == FieldStateEnum.FOOD then
+      _eatCell(self, nextXPosition, nextYPosition)
+    elseif nextFieldState == FieldStateEnum.EMPTY then
+      _moveCell(self, nextXPosition, nextYPosition)
+    elseif nextFieldState == FieldStateEnum.SNAKE then
+      for v in self.body:iterRight() do
+        if nextYPosition == v.y and nextXPosition == v.x then
+          _moveCell(self, nextXPosition, nextYPosition)
+        end  
       end
     end
   end
+end
+
+function _moveCell(self, nextXPosition, nextYPosition)
+  self.body:pushLeft(Vector2(nextXPosition, nextYPosition))
+  local prevPos = self.body:popRight()
+  self.field.maze.maze[nextYPosition][nextXPosition] = FieldStateEnum.SNAKE
+  self.field.maze.maze[prevPos.y][prevPos.x] = FieldStateEnum.EMPTY
+end
+
+function _eatCell(self, nextXPosition, nextYPosition)
+  self.body:pushLeft(Vector2(nextXPosition, nextYPosition))
+  self.field.maze.maze[nextYPosition][nextXPosition] = FieldStateEnum.SNAKE
+  self.field.foodPosition[nextYPosition][nextXPosition]:eat()
+  self.speed = self.speed + 1
+end
+
+function _initControls(self, controls)
+  local upCtrl = tactile.newControl():addButton(tactile.keys(controls.up))
+  local downCtrl = tactile.newControl():addButton(tactile.keys(controls.down))
+  local rightCtrl = tactile.newControl():addButton(tactile.keys(controls.right))
+  local leftCtrl = tactile.newControl():addButton(tactile.keys(controls.left))
+
+  return {up = upCtrl, down = downCtrl, right = rightCtrl, left = leftCtrl}
 end
 
 function _updateControls(self)
